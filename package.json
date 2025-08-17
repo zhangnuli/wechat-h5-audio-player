@@ -1,6 +1,6 @@
 {
   "name": "wechat-h5-audio-player",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "🎵 专为微信H5环境设计的音频播放器，支持iOS和Android微信的真正自动播放",
   "main": "dist/wechat-audio-player.cjs.js",
   "module": "dist/wechat-audio-player.esm.js",
