@@ -397,6 +397,14 @@ interface EnvironmentInfo {
 └─────────────────────────────────────┘
 ```
 
+#### 核心突破原理
+
+1. **WeixinJSBridgeReady时机** - 利用微信环境特殊时机
+2. **SoundJS音频引擎** - 专业音频库，支持多种播放策略  
+3. **内置零依赖** - 所有依赖已打包，无需CDN加载
+4. **智能环境适配** - 自动检测并选择最佳播放策略
+
+```typescript
 // 🎯 核心实现原理（简化版）
 class WechatAudioPlayer {
   async setupWeixinEnvironment() {
