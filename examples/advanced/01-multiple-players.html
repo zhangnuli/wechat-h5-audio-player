@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多播放器管理示例 - WeChat Audio Player</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .global-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .btn.danger {
+            background: rgba(244, 67, 54, 0.3);
+        }
+        
+        .btn.success {
+            background: rgba(76, 175, 80, 0.3);
+        }
+        
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .player-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+        
+        .player-card.active {
+            border-color: #4CAF50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+        
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .player-id {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .player-status {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-idle { background: rgba(128, 128, 128, 0.3); }
+        .status-loading { background: rgba(255, 193, 7, 0.3); }
+        .status-ready { background: rgba(33, 150, 243, 0.3); }
+        .status-playing { background: rgba(76, 175, 80, 0.3); }
+        .status-paused { background: rgba(255, 152, 0, 0.3); }
+        .status-error { background: rgba(244, 67, 54, 0.3); }
+        
+        .player-controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .player-controls .btn {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+        }
+        
+        .volume-control {
+            margin: 15px 0;
+        }
+        
+        .volume-slider {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .player-info {
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        
+        .stats-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .log-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+        
+        .log-time {
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎛️ 多播放器管理器</h1>
+            <p>演示如何同时管理多个音频播放器实例</p>
+        </div>
+        
+        <div class="control-panel">
+            <h3>🎮 全局控制</h3>
+            <div class="global-controls">
+                <button id="createPlayerBtn" class="btn success">➕ 创建播放器</button>
+                <button id="playAllBtn" class="btn">▶️ 全部播放</button>
+                <button id="pauseAllBtn" class="btn">⏸️ 全部暂停</button>
+                <button id="stopAllBtn" class="btn">⏹️ 全部停止</button>
+                <button id="destroyAllBtn" class="btn danger">🗑️ 销毁全部</button>
+            </div>
+            
+            <div class="stats-panel">
+                <h4>📊 统计信息</h4>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div id="totalPlayers" class="stat-value">0</div>
+                        <div class="stat-label">总播放器</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="activePlayers" class="stat-value">0</div>
+                        <div class="stat-label">播放中</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="errorPlayers" class="stat-value">0</div>
+                        <div class="stat-label">错误状态</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="memoryUsage" class="stat-value">0MB</div>
+                        <div class="stat-label">内存使用</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4>📝 操作日志</h4>
+                <button id="clearLogBtn" class="btn" style="padding: 5px 10px; font-size: 12px;">清除</button>
+            </div>
+            <div id="logPanel" class="log-panel">
+                <div class="log-entry">
+                    <span class="log-time">[系统]</span> 多播放器管理器初始化完成
+                </div>
+            </div>
+        </div>
+        
+        <div id="playersGrid" class="players-grid">
+            <!-- 播放器卡片将通过JavaScript生成 -->
+        </div>
+    </div>
+
+    <!-- 引入WeChat Audio Player -->
+    <script src="../../dist/wechat-audio-player.umd.js"></script>
+    
+    <script>
+        // 播放器管理器
+        class MultiPlayerManager {
+            constructor() {
+                this.players = new Map()
+                this.playerCounter = 0
+                this.stats = {
+                    total: 0,
+                    playing: 0,
+                    error: 0
+                }
+                this.setupEventListeners()
+                this.startStatsUpdate()
+            }
+            
+            // 音频源列表
+            getAudioSources() {
+                return [
+                    'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+                    'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // 可以重复使用
+                ]
+            }
+            
+            createPlayer() {
+                const playerId = `player_${++this.playerCounter}`
+                const sources = this.getAudioSources()
+                const randomSrc = sources[Math.floor(Math.random() * sources.length)]
+                
+                this.addLog(`🎵 创建播放器: ${playerId}`)
+                
+                try {
+                    const player = new WechatAudioPlayer.WechatAudioPlayer({
+                        src: randomSrc,
+                        autoplay: false,
+                        volume: 0.5 + Math.random() * 0.5, // 随机音量 50%-100%
+                        loop: Math.random() > 0.5, // 50%概率循环
+                        debug: false,
+                        
+                        onReady: () => {
+                            this.addLog(`✅ ${playerId} 准备就绪`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onPlay: () => {
+                            this.addLog(`▶️ ${playerId} 开始播放`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onPause: () => {
+                            this.addLog(`⏸️ ${playerId} 暂停播放`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onStop: () => {
+                            this.addLog(`⏹️ ${playerId} 停止播放`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onEnded: () => {
+                            this.addLog(`🏁 ${playerId} 播放结束`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onError: (error) => {
+                            this.addLog(`❌ ${playerId} 错误: ${error.message}`)
+                            this.updatePlayerUI(playerId)
+                        },
+                        
+                        onVolumeChange: (volume) => {
+                            this.updatePlayerUI(playerId)
+                        }
+                    })
+                    
+                    this.players.set(playerId, {
+                        instance: player,
+                        createdAt: Date.now(),
+                        src: randomSrc
+                    })
+                    
+                    this.createPlayerUI(playerId)
+                    this.updateStats()
+                    
+                } catch (error) {
+                    this.addLog(`❌ 创建 ${playerId} 失败: ${error.message}`)
+                }
+            }
+            
+            createPlayerUI(playerId) {
+                const playerData = this.players.get(playerId)
+                const playersGrid = document.getElementById('playersGrid')
+                
+                const card = document.createElement('div')
+                card.className = 'player-card'
+                card.id = `card-${playerId}`
+                
+                card.innerHTML = `
+                    <div class="player-header">
+                        <div class="player-id">${playerId}</div>
+                        <div id="status-${playerId}" class="player-status status-idle">IDLE</div>
+                    </div>
+                    
+                    <div class="player-controls">
+                        <button class="btn" onclick="playerManager.playPlayer('${playerId}')">▶️</button>
+                        <button class="btn" onclick="playerManager.pausePlayer('${playerId}')">⏸️</button>
+                        <button class="btn" onclick="playerManager.stopPlayer('${playerId}')">⏹️</button>
+                        <button class="btn danger" onclick="playerManager.destroyPlayer('${playerId}')">🗑️</button>
+                    </div>
+                    
+                    <div class="volume-control">
+                        <label>🔊 音量: <span id="volume-display-${playerId}">50%</span></label>
+                        <input type="range" class="volume-slider" 
+                               min="0" max="1" step="0.01" value="0.5"
+                               onInput="playerManager.setPlayerVolume('${playerId}', this.value)">
+                    </div>
+                    
+                    <div class="player-info">
+                        <div class="info-row">
+                            <span>状态:</span>
+                            <span id="state-${playerId}">idle</span>
+                        </div>
+                        <div class="info-row">
+                            <span>播放中:</span>
+                            <span id="playing-${playerId}">否</span>
+                        </div>
+                        <div class="info-row">
+                            <span>音量:</span>
+                            <span id="volume-${playerId}">50%</span>
+                        </div>
+                        <div class="info-row">
+                            <span>循环:</span>
+                            <span id="loop-${playerId}">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span>时长:</span>
+                            <span id="duration-${playerId}">0:00</span>
+                        </div>
+                        <div class="info-row">
+                            <span>音频源:</span>
+                            <span style="font-size: 10px; opacity: 0.8;">${playerData.src.split('/').pop()}</span>
+                        </div>
+                    </div>
+                `
+                
+                playersGrid.appendChild(card)
+            }
+            
+            updatePlayerUI(playerId) {
+                const playerData = this.players.get(playerId)
+                if (!playerData) return
+                
+                const player = playerData.instance
+                const status = player.getStatus()
+                
+                // 更新状态指示器
+                const statusEl = document.getElementById(`status-${playerId}`)
+                if (statusEl) {
+                    statusEl.textContent = status.state.toUpperCase()
+                    statusEl.className = `player-status status-${status.state}`
+                }
+                
+                // 更新卡片样式
+                const card = document.getElementById(`card-${playerId}`)
+                if (card) {
+                    card.classList.toggle('active', status.isPlaying)
+                }
+                
+                // 更新详细信息
+                this.updateElementText(`state-${playerId}`, status.state)
+                this.updateElementText(`playing-${playerId}`, status.isPlaying ? '是' : '否')
+                this.updateElementText(`volume-${playerId}`, Math.round(status.volume * 100) + '%')
+                this.updateElementText(`volume-display-${playerId}`, Math.round(status.volume * 100) + '%')
+                this.updateElementText(`loop-${playerId}`, status.loop ? '是' : '否')
+                this.updateElementText(`duration-${playerId}`, this.formatTime(status.duration))
+            }
+            
+            updateElementText(id, text) {
+                const el = document.getElementById(id)
+                if (el) el.textContent = text
+            }
+            
+            formatTime(seconds) {
+                if (isNaN(seconds) || seconds === Infinity) return '0:00'
+                const mins = Math.floor(seconds / 60)
+                const secs = Math.floor(seconds % 60)
+                return `${mins}:${secs.toString().padStart(2, '0')}`
+            }
+            
+            // 播放器操作方法
+            async playPlayer(playerId) {
+                const playerData = this.players.get(playerId)
+                if (playerData) {
+                    try {
+                        await playerData.instance.play()
+                    } catch (error) {
+                        this.addLog(`❌ ${playerId} 播放失败: ${error.message}`)
+                    }
+                }
+            }
+            
+            pausePlayer(playerId) {
+                const playerData = this.players.get(playerId)
+                if (playerData) {
+                    playerData.instance.pause()
+                }
+            }
+            
+            stopPlayer(playerId) {
+                const playerData = this.players.get(playerId)
+                if (playerData) {
+                    playerData.instance.stop()
+                }
+            }
+            
+            setPlayerVolume(playerId, volume) {
+                const playerData = this.players.get(playerId)
+                if (playerData) {
+                    playerData.instance.setVolume(parseFloat(volume))
+                }
+            }
+            
+            destroyPlayer(playerId) {
+                const playerData = this.players.get(playerId)
+                if (playerData) {
+                    this.addLog(`🗑️ 销毁播放器: ${playerId}`)
+                    playerData.instance.destroy()
+                    this.players.delete(playerId)
+                    
+                    const card = document.getElementById(`card-${playerId}`)
+                    if (card) {
+                        card.remove()
+                    }
+                    
+                    this.updateStats()
+                }
+            }
+            
+            // 全局操作
+            async playAll() {
+                this.addLog('▶️ 播放所有播放器')
+                for (const [playerId, playerData] of this.players) {
+                    try {
+                        await playerData.instance.play()
+                    } catch (error) {
+                        this.addLog(`❌ ${playerId} 播放失败`)
+                    }
+                }
+            }
+            
+            pauseAll() {
+                this.addLog('⏸️ 暂停所有播放器')
+                this.players.forEach((playerData, playerId) => {
+                    playerData.instance.pause()
+                })
+            }
+            
+            stopAll() {
+                this.addLog('⏹️ 停止所有播放器')
+                this.players.forEach((playerData, playerId) => {
+                    playerData.instance.stop()
+                })
+            }
+            
+            destroyAll() {
+                this.addLog('🗑️ 销毁所有播放器')
+                const playerIds = Array.from(this.players.keys())
+                playerIds.forEach(playerId => {
+                    this.destroyPlayer(playerId)
+                })
+            }
+            
+            updateStats() {
+                let playing = 0
+                let error = 0
+                
+                this.players.forEach((playerData) => {
+                    const status = playerData.instance.getStatus()
+                    if (status.isPlaying) playing++
+                    if (status.state === 'error') error++
+                })
+                
+                this.stats = {
+                    total: this.players.size,
+                    playing,
+                    error
+                }
+                
+                document.getElementById('totalPlayers').textContent = this.stats.total
+                document.getElementById('activePlayers').textContent = this.stats.playing
+                document.getElementById('errorPlayers').textContent = this.stats.error
+                
+                // 模拟内存使用
+                const memoryUsage = this.stats.total * 2.5 // 每个播放器约2.5MB
+                document.getElementById('memoryUsage').textContent = memoryUsage.toFixed(1) + 'MB'
+            }
+            
+            addLog(message) {
+                const logPanel = document.getElementById('logPanel')
+                const time = new Date().toLocaleTimeString()
+                
+                const entry = document.createElement('div')
+                entry.className = 'log-entry'
+                entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`
+                
+                logPanel.appendChild(entry)
+                logPanel.scrollTop = logPanel.scrollHeight
+                
+                // 限制日志条数
+                if (logPanel.children.length > 100) {
+                    logPanel.removeChild(logPanel.firstChild)
+                }
+            }
+            
+            setupEventListeners() {
+                document.getElementById('createPlayerBtn').onclick = () => this.createPlayer()
+                document.getElementById('playAllBtn').onclick = () => this.playAll()
+                document.getElementById('pauseAllBtn').onclick = () => this.pauseAll()
+                document.getElementById('stopAllBtn').onclick = () => this.stopAll()
+                document.getElementById('destroyAllBtn').onclick = () => this.destroyAll()
+                
+                document.getElementById('clearLogBtn').onclick = () => {
+                    const logPanel = document.getElementById('logPanel')
+                    logPanel.innerHTML = '<div class="log-entry"><span class="log-time">[系统]</span> 日志已清除</div>'
+                }
+            }
+            
+            startStatsUpdate() {
+                setInterval(() => {
+                    this.updateStats()
+                    // 更新所有播放器UI
+                    this.players.forEach((playerData, playerId) => {
+                        this.updatePlayerUI(playerId)
+                    })
+                }, 1000)
+            }
+        }
+        
+        // 全局播放器管理器实例
+        let playerManager
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            playerManager = new MultiPlayerManager()
+            
+            // 自动创建几个播放器作为示例
+            setTimeout(() => {
+                playerManager.createPlayer()
+                setTimeout(() => playerManager.createPlayer(), 500)
+                setTimeout(() => playerManager.createPlayer(), 1000)
+            }, 1000)
+        })
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (playerManager) {
+                playerManager.destroyAll()
+            }
+        })
+    </script>
+</body>
+</html>

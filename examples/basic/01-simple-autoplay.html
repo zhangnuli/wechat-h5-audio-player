@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最简单的自动播放 - WeChat Audio Player</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .status {
+            font-size: 18px;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .success { background: rgba(46, 160, 67, 0.3); }
+        .error { background: rgba(244, 67, 54, 0.3); }
+        .warning { background: rgba(255, 193, 7, 0.3); }
+        .info { background: rgba(33, 150, 243, 0.3); }
+        
+        .play-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            display: none;
+        }
+        .play-btn:hover {
+            background: #45a049;
+        }
+        
+        .env-info {
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .logo {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">🎵</div>
+            <h1>最简单的自动播放示例</h1>
+            <p>这个示例演示了如何用最少的代码实现微信环境的自动播放</p>
+            
+            <div id="status" class="status info">
+                📱 正在初始化播放器...
+            </div>
+            
+            <button id="playBtn" class="play-btn">🎵 点击播放</button>
+            
+            <div class="env-info">
+                <strong>📊 环境信息：</strong><br>
+                <div id="envInfo">检测中...</div>
+            </div>
+            
+            <div class="env-info">
+                <strong>📋 播放器状态：</strong><br>
+                <div id="playerStatus">未初始化</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入WeChat Audio Player -->
+    <script src="../../dist/wechat-audio-player.umd.js"></script>
+    
+    <script>
+        // 状态显示函数
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status')
+            statusEl.textContent = message
+            statusEl.className = `status ${type}`
+            
+            if (type === 'success') {
+                statusEl.classList.add('pulse')
+            }
+        }
+        
+        function updateEnvInfo(env) {
+            const envEl = document.getElementById('envInfo')
+            envEl.innerHTML = `
+                微信环境: ${env.isWeixin ? '✅ 是' : '❌ 否'}<br>
+                设备类型: ${env.isIOS ? 'iOS' : env.isAndroid ? 'Android' : 'Desktop'}<br>
+                浏览器: ${env.browserType}<br>
+                支持自动播放: ${env.supportsAutoplay ? '✅ 是' : '❌ 否'}<br>
+                协议: ${env.isHTTPS ? 'HTTPS' : 'HTTP'}
+            `
+        }
+        
+        function updatePlayerStatus(status) {
+            const statusEl = document.getElementById('playerStatus')
+            statusEl.innerHTML = `
+                状态: ${status.state}<br>
+                播放中: ${status.isPlaying ? '✅ 是' : '❌ 否'}<br>
+                音量: ${Math.round(status.volume * 100)}%<br>
+                时长: ${status.duration.toFixed(1)}秒
+            `
+        }
+        
+        // 创建播放器
+        let player = null
+        
+        // 在DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            updateStatus('🎵 正在创建播放器...', 'info')
+            
+            try {
+                // 创建播放器实例 - 最简配置
+                player = new WechatAudioPlayer.WechatAudioPlayer({
+                    src: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+                    autoplay: true,  // 🎯 关键：微信环境自动播放
+                    debug: true,     // 开启调试模式查看详细日志
+                    
+                    // 成功回调
+                    onReady: () => {
+                        updateStatus('✅ 播放器准备就绪', 'success')
+                        
+                        // 获取并显示环境信息
+                        const status = player.getStatus()
+                        updateEnvInfo(status.environment)
+                        updatePlayerStatus(status)
+                    },
+                    
+                    onPlay: () => {
+                        updateStatus('🎉 自动播放成功！无需任何用户交互', 'success')
+                        document.getElementById('playBtn').style.display = 'none'
+                    },
+                    
+                    onError: (error) => {
+                        console.error('播放失败:', error)
+                        updateStatus('⚠️ 自动播放失败，需要用户点击播放', 'warning')
+                        
+                        // 显示播放按钮
+                        const playBtn = document.getElementById('playBtn')
+                        playBtn.style.display = 'inline-block'
+                        playBtn.onclick = async () => {
+                            try {
+                                await player.play()
+                                updateStatus('✅ 手动播放成功', 'success')
+                                playBtn.style.display = 'none'
+                            } catch (err) {
+                                updateStatus('❌ 播放失败: ' + err.message, 'error')
+                            }
+                        }
+                    }
+                })
+                
+                // 定期更新播放器状态
+                setInterval(() => {
+                    if (player) {
+                        const status = player.getStatus()
+                        updatePlayerStatus(status)
+                    }
+                }, 1000)
+                
+            } catch (error) {
+                console.error('初始化失败:', error)
+                updateStatus('❌ 播放器初始化失败: ' + error.message, 'error')
+            }
+        })
+        
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (player) {
+                player.destroy()
+            }
+        })
+    </script>
+</body>
+</html>

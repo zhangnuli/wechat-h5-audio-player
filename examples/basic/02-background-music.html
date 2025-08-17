@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>背景音乐示例 - WeChat Audio Player</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            min-height: 100vh;
+            color: white;
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .music-player {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .music-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .music-icon.playing {
+            animation: musicPulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes musicPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            min-width: 100px;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .volume-control {
+            margin: 20px 0;
+        }
+        
+        .volume-slider {
+            width: 200px;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .status-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            transform: translateX(300px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background: rgba(244, 67, 54, 0.9);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 背景音乐播放器</h1>
+            <p>展示如何在H5页面中添加背景音乐，支持微信环境自动播放</p>
+        </div>
+        
+        <div class="music-player">
+            <div id="musicIcon" class="music-icon">🎼</div>
+            
+            <h3 id="songTitle">准备播放背景音乐...</h3>
+            
+            <div class="controls">
+                <button id="playBtn" class="btn">▶️ 播放</button>
+                <button id="pauseBtn" class="btn" disabled>⏸️ 暂停</button>
+                <button id="stopBtn" class="btn" disabled>⏹️ 停止</button>
+                <button id="muteBtn" class="btn">🔊 静音</button>
+            </div>
+            
+            <div class="volume-control">
+                <label>🔊 音量: <span id="volumeDisplay">80%</span></label><br>
+                <input type="range" id="volumeSlider" class="volume-slider" 
+                       min="0" max="1" step="0.01" value="0.8">
+            </div>
+            
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="timeDisplay">0:00 / 0:00</div>
+            
+            <div class="status-panel">
+                <div class="status-row">
+                    <span>播放状态:</span>
+                    <span id="playState">未初始化</span>
+                </div>
+                <div class="status-row">
+                    <span>环境检测:</span>
+                    <span id="envDetection">检测中...</span>
+                </div>
+                <div class="status-row">
+                    <span>自动播放:</span>
+                    <span id="autoplayStatus">等待中...</span>
+                </div>
+                <div class="status-row">
+                    <span>循环播放:</span>
+                    <span id="loopStatus">✅ 开启</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+
+    <!-- 引入WeChat Audio Player -->
+    <script src="../../dist/wechat-audio-player.umd.js"></script>
+    
+    <script>
+        let player = null
+        
+        // DOM元素
+        const musicIcon = document.getElementById('musicIcon')
+        const songTitle = document.getElementById('songTitle')
+        const playBtn = document.getElementById('playBtn')
+        const pauseBtn = document.getElementById('pauseBtn')
+        const stopBtn = document.getElementById('stopBtn')
+        const muteBtn = document.getElementById('muteBtn')
+        const volumeSlider = document.getElementById('volumeSlider')
+        const volumeDisplay = document.getElementById('volumeDisplay')
+        const progressFill = document.getElementById('progressFill')
+        const timeDisplay = document.getElementById('timeDisplay')
+        const playState = document.getElementById('playState')
+        const envDetection = document.getElementById('envDetection')
+        const autoplayStatus = document.getElementById('autoplayStatus')
+        const notification = document.getElementById('notification')
+        
+        // 工具函数
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds === Infinity) return '0:00'
+            const mins = Math.floor(seconds / 60)
+            const secs = Math.floor(seconds % 60)
+            return `${mins}:${secs.toString().padStart(2, '0')}`
+        }
+        
+        function showNotification(message, isError = false) {
+            notification.textContent = message
+            notification.className = `notification ${isError ? 'error' : ''} show`
+            setTimeout(() => {
+                notification.classList.remove('show')
+            }, 3000)
+        }
+        
+        function updateUI() {
+            if (!player) return
+            
+            const status = player.getStatus()
+            
+            // 更新播放状态
+            playState.textContent = status.state
+            
+            // 更新按钮状态
+            playBtn.disabled = status.isPlaying
+            pauseBtn.disabled = !status.isPlaying
+            stopBtn.disabled = status.state === 'idle' || status.state === 'loading'
+            
+            // 更新静音按钮
+            muteBtn.textContent = status.muted ? '🔇 取消静音' : '🔊 静音'
+            
+            // 更新音量显示
+            volumeDisplay.textContent = Math.round(status.volume * 100) + '%'
+            volumeSlider.value = status.volume
+            
+            // 更新进度条
+            if (status.duration > 0) {
+                const progress = (status.currentTime / status.duration) * 100
+                progressFill.style.width = progress + '%'
+                timeDisplay.textContent = `${formatTime(status.currentTime)} / ${formatTime(status.duration)}`
+            }
+            
+            // 更新音乐图标动画
+            if (status.isPlaying) {
+                musicIcon.classList.add('playing')
+                musicIcon.textContent = '🎵'
+            } else {
+                musicIcon.classList.remove('playing')
+                musicIcon.textContent = '🎼'
+            }
+        }
+        
+        // 初始化播放器
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                songTitle.textContent = '🎵 正在初始化播放器...'
+                
+                player = new WechatAudioPlayer.WechatAudioPlayer({
+                    src: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+                    autoplay: true,
+                    loop: true,      // 🔄 背景音乐循环播放
+                    volume: 0.6,     // 适中音量，避免打扰用户
+                    debug: true,
+                    
+                    onReady: () => {
+                        songTitle.textContent = '🎵 背景音乐 - 铃声'
+                        
+                        const status = player.getStatus()
+                        const env = status.environment
+                        
+                        envDetection.textContent = `${env.isWeixin ? '微信' : '浏览器'} / ${env.isIOS ? 'iOS' : env.isAndroid ? 'Android' : 'Desktop'}`
+                        
+                        showNotification('✅ 播放器准备就绪')
+                        updateUI()
+                    },
+                    
+                    onPlay: () => {
+                        autoplayStatus.textContent = '✅ 自动播放成功'
+                        showNotification('🎵 背景音乐开始播放')
+                        updateUI()
+                    },
+                    
+                    onPause: () => {
+                        showNotification('⏸️ 背景音乐已暂停')
+                        updateUI()
+                    },
+                    
+                    onStop: () => {
+                        showNotification('⏹️ 背景音乐已停止')
+                        updateUI()
+                    },
+                    
+                    onError: (error) => {
+                        autoplayStatus.textContent = '❌ 需要用户交互'
+                        showNotification('⚠️ 自动播放失败，请点击播放按钮', true)
+                        console.error('播放错误:', error)
+                        updateUI()
+                    },
+                    
+                    onVolumeChange: (volume) => {
+                        updateUI()
+                    },
+                    
+                    onTimeUpdate: (currentTime) => {
+                        updateUI()
+                    }
+                })
+                
+                // 绑定控制按钮
+                playBtn.onclick = async () => {
+                    try {
+                        await player.play()
+                    } catch (error) {
+                        showNotification('播放失败: ' + error.message, true)
+                    }
+                }
+                
+                pauseBtn.onclick = () => {
+                    player.pause()
+                }
+                
+                stopBtn.onclick = () => {
+                    player.stop()
+                }
+                
+                muteBtn.onclick = () => {
+                    player.setMuted(!player.isMuted())
+                }
+                
+                volumeSlider.oninput = (e) => {
+                    player.setVolume(parseFloat(e.target.value))
+                }
+                
+                // 定期更新UI
+                setInterval(updateUI, 500)
+                
+            } catch (error) {
+                songTitle.textContent = '❌ 初始化失败'
+                showNotification('初始化失败: ' + error.message, true)
+                console.error('初始化错误:', error)
+            }
+        })
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (player) {
+                player.destroy()
+            }
+        })
+        
+        // 页面可见性API - 页面隐藏时暂停，显示时恢复
+        document.addEventListener('visibilitychange', () => {
+            if (!player) return
+            
+            if (document.hidden) {
+                // 页面隐藏时暂停
+                if (player.getStatus().isPlaying) {
+                    player.pause()
+                    showNotification('📱 页面切换到后台，音乐已暂停')
+                }
+            } else {
+                // 页面显示时可以选择恢复播放
+                // 注意：这里不自动恢复，让用户决定
+                showNotification('📱 页面回到前台')
+            }
+        })
+    </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+{
+  "name": "wechat-h5-audio-player",
+  "version": "1.0.1",
+  "description": "🎵 专为微信H5环境设计的音频播放器，支持iOS和Android微信的真正自动播放",
+  "main": "dist/wechat-audio-player.cjs.js",
+  "module": "dist/wechat-audio-player.esm.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/wechat-audio-player.esm.js",
+      "require": "./dist/wechat-audio-player.cjs.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.tsx --fix",
+    "lint:check": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run typecheck && npm run build",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
+  },
+  "keywords": [
+    "wechat",
+    "weixin",
+    "h5",
+    "audio",
+    "player",
+    "autoplay",
+    "mobile",
+    "sound",
+    "music",
+    "soundjs",
+    "typescript",
+    "ios",
+    "android",
+    "微信",
+    "音频播放器",
+    "自动播放"
+  ],
+  "author": {
+    "name": "zhangnuli",
+    "email": "zhangnuli@hdsite.com.cn"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangnuli/wechat-h5-audio-player.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhangnuli/wechat-h5-audio-player/issues"
+  },
+  "homepage": "https://github.com/zhangnuli/wechat-h5-audio-player#readme",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "iOS >= 10",
+    "Android >= 5"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
+    "@vitest/ui": "^1.4.0",
+    "eslint": "^8.57.0",
+    "rimraf": "^5.0.5",
+    "terser": "^5.43.1",
+    "typescript": "^5.4.4",
+    "vite": "^4.5.14",
+    "vite-plugin-dts": "^3.8.3",
+    "vitest": "^1.4.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "soundjs": "^1.0.1"
+  }
+}

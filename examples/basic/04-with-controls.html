@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整控制器示例 - WeChat Audio Player</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .player-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .album-art {
+            width: 200px;
+            height: 200px;
+            border-radius: 20px;
+            margin: 0 auto 20px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            transition: all 0.3s ease;
+        }
+        
+        .album-art.playing {
+            animation: rotate 20s linear infinite;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .track-info {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .track-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .track-artist {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-handle {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            left: 0%;
+            transition: left 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .control-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .control-btn.primary {
+            width: 80px;
+            height: 80px;
+            font-size: 32px;
+            background: rgba(255, 255, 255, 0.25);
+        }
+        
+        .volume-section {
+            margin: 20px 0;
+        }
+        
+        .volume-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .volume-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .volume-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+        }
+        
+        .volume-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .settings-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+        
+        .toggle-handle {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+        
+        .toggle-switch.active .toggle-handle {
+            transform: translateX(25px);
+        }
+        
+        .status-display {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="player-card">
+            <div id="albumArt" class="album-art">🎵</div>
+            
+            <div class="track-info">
+                <div id="trackTitle" class="track-title">音频播放器</div>
+                <div id="trackArtist" class="track-artist">WeChat H5 Audio Player</div>
+            </div>
+            
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                    <div id="progressHandle" class="progress-handle"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="prevBtn" class="control-btn" title="上一首">⏮️</button>
+                <button id="playBtn" class="control-btn primary" title="播放">▶️</button>
+                <button id="nextBtn" class="control-btn" title="下一首">⏭️</button>
+                <button id="stopBtn" class="control-btn" title="停止">⏹️</button>
+            </div>
+            
+            <div class="volume-section">
+                <h4>🔊 音量控制</h4>
+                <div class="volume-controls">
+                    <button id="muteBtn" class="volume-btn">🔊</button>
+                    <input type="range" id="volumeSlider" class="volume-slider" 
+                           min="0" max="1" step="0.01" value="0.8">
+                    <span id="volumeValue">80%</span>
+                </div>
+            </div>
+            
+            <div class="settings-panel">
+                <h4>⚙️ 播放设置</h4>
+                
+                <div class="setting-row">
+                    <span>循环播放</span>
+                    <div id="loopToggle" class="toggle-switch">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="setting-row">
+                    <span>自动播放</span>
+                    <div id="autoplayToggle" class="toggle-switch active">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="setting-row">
+                    <span>调试模式</span>
+                    <div id="debugToggle" class="toggle-switch active">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-display">
+                <div class="status-row">
+                    <span>状态:</span>
+                    <span id="playerState">未初始化</span>
+                </div>
+                <div class="status-row">
+                    <span>环境:</span>
+                    <span id="envInfo">检测中...</span>
+                </div>
+                <div class="status-row">
+                    <span>支持自动播放:</span>
+                    <span id="autoplaySupport">检测中...</span>
+                </div>
+                <div class="status-row">
+                    <span>加载进度:</span>
+                    <span id="loadProgress">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入WeChat Audio Player -->
+    <script src="../../dist/wechat-audio-player.umd.js"></script>
+    
+    <script>
+        let player = null
+        let isDragging = false
+        
+        // 播放列表
+        const playlist = [
+            {
+                title: '测试音频 - 铃声',
+                artist: 'SoundJay',
+                src: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
+            }
+        ]
+        
+        let currentTrack = 0
+        
+        // DOM元素
+        const albumArt = document.getElementById('albumArt')
+        const trackTitle = document.getElementById('trackTitle')
+        const trackArtist = document.getElementById('trackArtist')
+        const progressBar = document.getElementById('progressBar')
+        const progressFill = document.getElementById('progressFill')
+        const progressHandle = document.getElementById('progressHandle')
+        const currentTimeEl = document.getElementById('currentTime')
+        const durationEl = document.getElementById('duration')
+        const playBtn = document.getElementById('playBtn')
+        const stopBtn = document.getElementById('stopBtn')
+        const prevBtn = document.getElementById('prevBtn')
+        const nextBtn = document.getElementById('nextBtn')
+        const muteBtn = document.getElementById('muteBtn')
+        const volumeSlider = document.getElementById('volumeSlider')
+        const volumeValue = document.getElementById('volumeValue')
+        const loopToggle = document.getElementById('loopToggle')
+        const autoplayToggle = document.getElementById('autoplayToggle')
+        const debugToggle = document.getElementById('debugToggle')
+        const playerState = document.getElementById('playerState')
+        const envInfo = document.getElementById('envInfo')
+        const autoplaySupport = document.getElementById('autoplaySupport')
+        const loadProgress = document.getElementById('loadProgress')
+        
+        // 工具函数
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds === Infinity) return '0:00'
+            const mins = Math.floor(seconds / 60)
+            const secs = Math.floor(seconds % 60)
+            return `${mins}:${secs.toString().padStart(2, '0')}`
+        }
+        
+        function updateProgress() {
+            if (!player || isDragging) return
+            
+            const status = player.getStatus()
+            if (status.duration > 0) {
+                const progress = (status.currentTime / status.duration) * 100
+                progressFill.style.width = progress + '%'
+                progressHandle.style.left = progress + '%'
+                currentTimeEl.textContent = formatTime(status.currentTime)
+                durationEl.textContent = formatTime(status.duration)
+            }
+        }
+        
+        function updateUI() {
+            if (!player) return
+            
+            const status = player.getStatus()
+            
+            // 更新播放状态
+            playerState.textContent = status.state
+            
+            // 更新按钮
+            if (status.isPlaying) {
+                playBtn.textContent = '⏸️'
+                playBtn.title = '暂停'
+                albumArt.classList.add('playing')
+            } else {
+                playBtn.textContent = '▶️'
+                playBtn.title = '播放'
+                albumArt.classList.remove('playing')
+            }
+            
+            // 更新音量
+            volumeValue.textContent = Math.round(status.volume * 100) + '%'
+            volumeSlider.value = status.volume
+            muteBtn.textContent = status.muted ? '🔇' : '🔊'
+            
+            // 更新环境信息
+            const env = status.environment
+            envInfo.textContent = `${env.isWeixin ? '微信' : '浏览器'} / ${env.isIOS ? 'iOS' : env.isAndroid ? 'Android' : 'Desktop'}`
+            autoplaySupport.textContent = env.supportsAutoplay ? '✅ 支持' : '❌ 不支持'
+            
+            // 更新加载进度
+            loadProgress.textContent = Math.round(status.loadProgress * 100) + '%'
+            
+            // 更新循环状态
+            if (status.loop !== loopToggle.classList.contains('active')) {
+                loopToggle.classList.toggle('active', status.loop)
+            }
+        }
+        
+        function loadTrack(index) {
+            if (index < 0 || index >= playlist.length) return
+            
+            currentTrack = index
+            const track = playlist[currentTrack]
+            
+            trackTitle.textContent = track.title
+            trackArtist.textContent = track.artist
+            
+            if (player) {
+                player.destroy()
+            }
+            
+            createPlayer(track.src)
+        }
+        
+        function createPlayer(src) {
+            const isAutoplay = autoplayToggle.classList.contains('active')
+            const isDebug = debugToggle.classList.contains('active')
+            const isLoop = loopToggle.classList.contains('active')
+            
+            player = new WechatAudioPlayer.WechatAudioPlayer({
+                src: src,
+                autoplay: isAutoplay,
+                loop: isLoop,
+                volume: parseFloat(volumeSlider.value),
+                debug: isDebug,
+                
+                onReady: () => {
+                    console.log('播放器准备就绪')
+                    updateUI()
+                },
+                
+                onPlay: () => {
+                    console.log('开始播放')
+                    updateUI()
+                },
+                
+                onPause: () => {
+                    console.log('暂停播放')
+                    updateUI()
+                },
+                
+                onStop: () => {
+                    console.log('停止播放')
+                    updateUI()
+                },
+                
+                onEnded: () => {
+                    console.log('播放结束')
+                    if (!player.isLoop()) {
+                        // 非循环模式下播放下一首
+                        nextTrack()
+                    }
+                    updateUI()
+                },
+                
+                onError: (error) => {
+                    console.error('播放错误:', error)
+                    updateUI()
+                },
+                
+                onVolumeChange: (volume) => {
+                    updateUI()
+                },
+                
+                onTimeUpdate: (currentTime) => {
+                    updateProgress()
+                }
+            })
+        }
+        
+        function togglePlay() {
+            if (!player) return
+            
+            const status = player.getStatus()
+            if (status.isPlaying) {
+                player.pause()
+            } else {
+                player.play()
+            }
+        }
+        
+        function stopTrack() {
+            if (player) {
+                player.stop()
+            }
+        }
+        
+        function prevTrack() {
+            const newIndex = currentTrack - 1
+            if (newIndex >= 0) {
+                loadTrack(newIndex)
+            }
+        }
+        
+        function nextTrack() {
+            const newIndex = currentTrack + 1
+            if (newIndex < playlist.length) {
+                loadTrack(newIndex)
+            } else {
+                // 到达列表末尾，回到第一首
+                loadTrack(0)
+            }
+        }
+        
+        function toggleMute() {
+            if (player) {
+                player.setMuted(!player.isMuted())
+            }
+        }
+        
+        // 进度条拖拽功能
+        function setupProgressBar() {
+            let startX = 0
+            let startProgress = 0
+            
+            function onMouseDown(e) {
+                if (!player) return
+                isDragging = true
+                const rect = progressBar.getBoundingClientRect()
+                startX = e.clientX - rect.left
+                startProgress = (startX / rect.width) * 100
+                
+                document.addEventListener('mousemove', onMouseMove)
+                document.addEventListener('mouseup', onMouseUp)
+                e.preventDefault()
+            }
+            
+            function onMouseMove(e) {
+                if (!isDragging) return
+                
+                const rect = progressBar.getBoundingClientRect()
+                const x = e.clientX - rect.left
+                const progress = Math.max(0, Math.min(100, (x / rect.width) * 100))
+                
+                progressFill.style.width = progress + '%'
+                progressHandle.style.left = progress + '%'
+                
+                // 实时更新时间显示
+                const status = player.getStatus()
+                if (status.duration > 0) {
+                    const time = (progress / 100) * status.duration
+                    currentTimeEl.textContent = formatTime(time)
+                }
+            }
+            
+            function onMouseUp(e) {
+                if (!isDragging) return
+                isDragging = false
+                
+                const rect = progressBar.getBoundingClientRect()
+                const x = e.clientX - rect.left
+                const progress = Math.max(0, Math.min(100, (x / rect.width) * 100))
+                
+                // 这里应该有seek功能，但当前版本暂不支持
+                console.log('尝试跳转到:', progress + '%')
+                
+                document.removeEventListener('mousemove', onMouseMove)
+                document.removeEventListener('mouseup', onMouseUp)
+            }
+            
+            progressBar.addEventListener('mousedown', onMouseDown)
+            progressHandle.addEventListener('mousedown', onMouseDown)
+        }
+        
+        // 切换开关功能
+        function setupToggles() {
+            loopToggle.onclick = () => {
+                const isActive = loopToggle.classList.toggle('active')
+                if (player) {
+                    player.setLoop(isActive)
+                }
+            }
+            
+            autoplayToggle.onclick = () => {
+                autoplayToggle.classList.toggle('active')
+                // 自动播放设置需要重新创建播放器
+            }
+            
+            debugToggle.onclick = () => {
+                debugToggle.classList.toggle('active')
+                // 调试模式需要重新创建播放器
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 绑定控制按钮
+            playBtn.onclick = togglePlay
+            stopBtn.onclick = stopTrack
+            prevBtn.onclick = prevTrack
+            nextBtn.onclick = nextTrack
+            muteBtn.onclick = toggleMute
+            
+            // 音量控制
+            volumeSlider.oninput = (e) => {
+                const volume = parseFloat(e.target.value)
+                if (player) {
+                    player.setVolume(volume)
+                }
+                volumeValue.textContent = Math.round(volume * 100) + '%'
+            }
+            
+            // 设置功能
+            setupProgressBar()
+            setupToggles()
+            
+            // 加载第一首歌
+            loadTrack(0)
+            
+            // 定期更新UI
+            setInterval(updateUI, 500)
+            
+            // 键盘快捷键
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return
+                
+                switch (e.key) {
+                    case ' ':
+                        e.preventDefault()
+                        togglePlay()
+                        break
+                    case 'ArrowLeft':
+                        prevTrack()
+                        break
+                    case 'ArrowRight':
+                        nextTrack()
+                        break
+                    case 'ArrowUp':
+                        e.preventDefault()
+                        const currentVol = parseFloat(volumeSlider.value)
+                        volumeSlider.value = Math.min(1, currentVol + 0.1)
+                        volumeSlider.oninput({target: volumeSlider})
+                        break
+                    case 'ArrowDown':
+                        e.preventDefault()
+                        const currentVol2 = parseFloat(volumeSlider.value)
+                        volumeSlider.value = Math.max(0, currentVol2 - 0.1)
+                        volumeSlider.oninput({target: volumeSlider})
+                        break
+                    case 'm':
+                        toggleMute()
+                        break
+                }
+            })
+        })
+        
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (player) {
+                player.destroy()
+            }
+        })
+    </script>
+</body>
+</html>

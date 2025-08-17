@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <title>WeChat H5 Audio Player - 企业级演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h3 {
+            color: #2563eb;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.success { background: #10b981; }
+        .status-indicator.warning { background: #f59e0b; }
+        .status-indicator.error { background: #ef4444; }
+        .status-indicator.loading { 
+            background: #3b82f6; 
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .control-section {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            flex: 1;
+            min-width: 120px;
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #047857);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn:disabled {
+            background: #f1f5f9 !important;
+            color: #94a3b8 !important;
+            cursor: not-allowed;
+            box-shadow: none !important;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .info-item {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            transition: width 0.1s ease;
+            border-radius: 3px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .log-container {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border: 1px solid #334155;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            line-height: 1.5;
+            opacity: 0;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .log-timestamp {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .log-info { color: #22d3ee; }
+        .log-warn { color: #fbbf24; }
+        .log-error { color: #f87171; }
+        .log-debug { color: #a78bfa; }
+
+        .environment-banner {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .environment-banner.wechat {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .environment-banner.non-wechat {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .music-visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            margin: 20px 0;
+        }
+
+        .bar {
+            width: 4px;
+            height: 20px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .bar.active {
+            background: linear-gradient(to top, #3b82f6, #1d4ed8);
+            animation: bounce 0.8s infinite alternate;
+        }
+
+        .bar:nth-child(2) { animation-delay: 0.1s; }
+        .bar:nth-child(3) { animation-delay: 0.2s; }
+        .bar:nth-child(4) { animation-delay: 0.3s; }
+        .bar:nth-child(5) { animation-delay: 0.2s; }
+        .bar:nth-child(6) { animation-delay: 0.1s; }
+
+        @keyframes bounce {
+            to { height: 40px; }
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .control-group { flex-direction: column; }
+            .btn { width: 100%; flex: none; }
+            .info-grid { grid-template-columns: 1fr; }
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #10b981, #047857);
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .success-message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 环境检测横幅 -->
+        <div id="environmentBanner" class="environment-banner">
+            🔍 正在检测环境...
+        </div>
+
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🎵 WeChat H5 Audio Player</h1>
+            <p>企业级微信H5音频播放器 - 自动初始化 & 自动播放演示</p>
+        </div>
+
+        <!-- 成功消息 -->
+        <div id="successMessage" class="success-message">
+            🎉 微信环境自动播放成功！iOS和Android都支持！
+        </div>
+
+        <!-- 播放控制 -->
+        <div class="card">
+            <h3>
+                <span class="status-indicator" id="playerIndicator"></span>
+                🎮 播放控制
+            </h3>
+            
+            <!-- 音乐可视化 -->
+            <div class="music-visualizer" id="visualizer">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+
+            <!-- 控制按钮 -->
+            <div class="control-section">
+                <div class="control-group">
+                    <button class="btn btn-primary" id="initBtn">
+                        🔄 自动初始化中...
+                    </button>
+                    <button class="btn btn-success" id="autoPlayBtn" disabled>
+                        🎵 检查播放状态
+                    </button>
+                    <button class="btn btn-secondary" id="playBtn" disabled>
+                        ▶️ 播放
+                    </button>
+                    <button class="btn btn-secondary" id="pauseBtn" disabled>
+                        ⏸️ 暂停
+                    </button>
+                    <button class="btn btn-danger" id="stopBtn" disabled>
+                        ⏹️ 停止
+                    </button>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>播放进度</span>
+                    <span id="timeDisplay">0:00 / 0:00</span>
+                </div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- 音量控制 -->
+            <div class="volume-control">
+                <span>🔊</span>
+                <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.8">
+                <span id="volumeDisplay">80%</span>
+            </div>
+        </div>
+
+        <!-- 状态信息 -->
+        <div class="card">
+            <h3>
+                <span class="status-indicator success"></span>
+                📊 状态监控
+            </h3>
+            
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">播放状态</div>
+                    <div class="info-value" id="playerState">未初始化</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">环境类型</div>
+                    <div class="info-value" id="environmentType">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">自动播放支持</div>
+                    <div class="info-value" id="autoPlaySupport">检测中</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">SoundJS状态</div>
+                    <div class="info-value" id="soundjsStatus">未加载</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 实时日志 -->
+        <div class="card">
+            <h3>
+                <span class="status-indicator success"></span>
+                📝 实时日志
+            </h3>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry log-info">
+                    <span class="log-timestamp">[启动]</span>
+                    WeChat H5 Audio Player 演示页面加载完成
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入构建的库文件 -->
+    <script src="../dist/wechat-audio-player.umd.js"></script>
+    
+    <script>
+        // 全局变量
+        let player = null
+        let updateInterval = null
+
+        // 测试音频URL
+        const DEMO_AUDIO_URL = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
+
+        // DOM元素
+        const elements = {
+            environmentBanner: document.getElementById('environmentBanner'),
+            playerIndicator: document.getElementById('playerIndicator'),
+            visualizer: document.getElementById('visualizer'),
+            successMessage: document.getElementById('successMessage'),
+            
+            // 按钮
+            initBtn: document.getElementById('initBtn'),
+            autoPlayBtn: document.getElementById('autoPlayBtn'),
+            playBtn: document.getElementById('playBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            
+            // 显示元素
+            timeDisplay: document.getElementById('timeDisplay'),
+            progressFill: document.getElementById('progressFill'),
+            volumeSlider: document.getElementById('volumeSlider'),
+            volumeDisplay: document.getElementById('volumeDisplay'),
+            
+            // 状态显示
+            playerState: document.getElementById('playerState'),
+            environmentType: document.getElementById('environmentType'),
+            autoPlaySupport: document.getElementById('autoPlaySupport'),
+            soundjsStatus: document.getElementById('soundjsStatus'),
+            
+            logContainer: document.getElementById('logContainer')
+        }
+
+        // 日志功能
+        function addLog(level, message) {
+            const logEntry = document.createElement('div')
+            logEntry.className = `log-entry log-${level}`
+            
+            const timestamp = new Date().toLocaleTimeString()
+            logEntry.innerHTML = `
+                <span class="log-timestamp">[${timestamp}]</span>
+                ${message}
+            `
+            
+            elements.logContainer.appendChild(logEntry)
+            elements.logContainer.scrollTop = elements.logContainer.scrollHeight
+            
+            // 限制日志条数
+            const logs = elements.logContainer.querySelectorAll('.log-entry')
+            if (logs.length > 50) {
+                logs[0].remove()
+            }
+        }
+
+        // 格式化时间
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds === Infinity) return '0:00'
+            const mins = Math.floor(seconds / 60)
+            const secs = Math.floor(seconds % 60)
+            return `${mins}:${secs.toString().padStart(2, '0')}`
+        }
+
+        // 检测环境
+        function detectEnvironment() {
+            const ua = navigator.userAgent.toLowerCase()
+            const isWeixin = /micromessenger/i.test(ua)
+            const isIOS = /iphone|ipad|ipod/i.test(ua)
+            const isAndroid = /android/i.test(ua)
+            const isHTTPS = location.protocol === 'https:'
+
+            let envText = ''
+            let envClass = ''
+
+            if (isWeixin) {
+                envText = `✅ 微信环境检测成功！${isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'} ${isHTTPS ? 'HTTPS' : 'HTTP'}`
+                envClass = 'wechat'
+                elements.environmentType.textContent = `微信${isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'}`
+                elements.autoPlaySupport.textContent = '支持'
+                elements.autoPlaySupport.style.color = '#10b981'
+            } else {
+                envText = `⚠️ 非微信环境，某些功能可能受限`
+                envClass = 'non-wechat'
+                elements.environmentType.textContent = isIOS ? 'iOS Safari' : isAndroid ? 'Android' : 'Desktop'
+                elements.autoPlaySupport.textContent = '需交互'
+                elements.autoPlaySupport.style.color = '#f59e0b'
+            }
+
+            elements.environmentBanner.textContent = envText
+            elements.environmentBanner.className = `environment-banner ${envClass}`
+
+            addLog('info', `环境检测: ${envText}`)
+            return { isWeixin, isIOS, isAndroid, isHTTPS }
+        }
+
+        // 更新播放器状态
+        function updatePlayerStatus() {
+            if (!player) return
+
+            try {
+                const status = player.getStatus()
+                
+                // 更新状态显示
+                elements.playerState.textContent = status.state
+                elements.timeDisplay.textContent = 
+                    `${formatTime(status.currentTime)} / ${formatTime(status.duration)}`
+                
+                // 更新进度条
+                const progressPercent = status.duration > 0 ? 
+                    (status.currentTime / status.duration) * 100 : 0
+                elements.progressFill.style.width = progressPercent + '%'
+                
+                // 更新按钮状态
+                updateButtons(status)
+                
+                // 更新可视化效果
+                updateVisualizer(status.isPlaying)
+                
+                // 更新指示器
+                if (status.state === 'playing') {
+                    elements.playerIndicator.className = 'status-indicator success'
+                } else if (status.state === 'loading') {
+                    elements.playerIndicator.className = 'status-indicator loading'
+                } else if (status.state === 'error') {
+                    elements.playerIndicator.className = 'status-indicator error'
+                } else {
+                    elements.playerIndicator.className = 'status-indicator'
+                }
+                
+            } catch (error) {
+                addLog('error', `状态更新失败: ${error.message}`)
+            }
+        }
+
+        // 更新按钮状态
+        function updateButtons(status) {
+            const isReady = status.state === 'ready' || status.state === 'playing' || status.state === 'paused'
+            const isPlaying = status.state === 'playing'
+            const isLoading = status.state === 'loading'
+
+            elements.playBtn.disabled = !isReady || isLoading
+            elements.pauseBtn.disabled = !isPlaying
+            elements.stopBtn.disabled = !isReady || status.state === 'idle'
+
+            if (isPlaying) {
+                elements.playBtn.textContent = '⏸️ 暂停'
+                elements.playBtn.className = 'btn btn-danger'
+            } else {
+                elements.playBtn.textContent = '▶️ 播放'
+                elements.playBtn.className = 'btn btn-success'
+            }
+        }
+
+        // 更新可视化效果
+        function updateVisualizer(isPlaying) {
+            const bars = elements.visualizer.querySelectorAll('.bar')
+            bars.forEach(bar => {
+                if (isPlaying) {
+                    bar.classList.add('active')
+                } else {
+                    bar.classList.remove('active')
+                }
+            })
+        }
+
+        // 显示成功消息
+        function showSuccessMessage() {
+            elements.successMessage.classList.add('show')
+            setTimeout(() => {
+                elements.successMessage.classList.remove('show')
+            }, 3000)
+        }
+
+        // 初始化播放器
+        async function initializePlayer() {
+            try {
+                elements.initBtn.disabled = true
+                elements.initBtn.textContent = '🔄 初始化中...'
+                
+                addLog('info', '开始初始化播放器...')
+
+                // 创建播放器实例
+                player = new WechatAudioPlayer.WechatAudioPlayer({
+                    src: DEMO_AUDIO_URL,
+                    autoplay: true,  // 🚀 启用自动播放
+                    loop: true,
+                    volume: 0.8,
+                    debug: true,
+                    
+                    onReady: () => {
+                        addLog('info', '🎵 播放器准备就绪')
+                        elements.autoPlayBtn.disabled = false
+                        elements.soundjsStatus.textContent = '已加载'
+                        elements.soundjsStatus.style.color = '#10b981'
+                    },
+                    
+                    onPlay: () => {
+                        addLog('info', '🎵 开始播放')
+                        showSuccessMessage()
+                    },
+                    
+                    onPause: () => {
+                        addLog('info', '⏸️ 播放暂停')
+                    },
+                    
+                    onStop: () => {
+                        addLog('info', '⏹️ 播放停止')
+                    },
+                    
+                    onError: (error) => {
+                        addLog('error', `❌ 播放错误: ${error.message}`)
+                    },
+                    
+                    onVolumeChange: (volume) => {
+                        addLog('debug', `🔊 音量变化: ${Math.round(volume * 100)}%`)
+                    }
+                })
+
+                // 开始状态更新
+                updateInterval = setInterval(updatePlayerStatus, 200)
+
+                elements.initBtn.textContent = '✅ 初始化完成'
+                addLog('info', '✅ 播放器初始化成功')
+
+            } catch (error) {
+                addLog('error', `❌ 初始化失败: ${error.message}`)
+                elements.initBtn.disabled = false
+                elements.initBtn.textContent = '🚀 重新初始化'
+            }
+        }
+
+        // 自动播放测试
+        async function testAutoPlay() {
+            if (!player) return
+
+            try {
+                elements.autoPlayBtn.disabled = true
+                elements.autoPlayBtn.textContent = '🔄 测试中...'
+                
+                addLog('info', '🚀 开始手动播放测试...')
+                const status = player.getStatus()
+                
+                if (status.isPlaying) {
+                    addLog('info', '✅ 检测到音频已在自动播放！')
+                    elements.autoPlayBtn.textContent = '✅ 已自动播放'
+                } else {
+                    await player.play()
+                    elements.autoPlayBtn.textContent = '✅ 手动播放成功'
+                }
+                
+                elements.autoPlayBtn.style.background = 'linear-gradient(135deg, #10b981, #047857)'
+                
+            } catch (error) {
+                addLog('error', `❌ 播放失败: ${error.message}`)
+                elements.autoPlayBtn.textContent = '❌ 播放失败'
+                elements.autoPlayBtn.disabled = false
+            }
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            addLog('info', 'WeChat H5 Audio Player 演示页面初始化...')
+            
+            // 检测环境
+            const env = detectEnvironment()
+            
+            // 绑定事件
+            elements.initBtn.onclick = initializePlayer
+            elements.autoPlayBtn.onclick = testAutoPlay
+            
+            elements.playBtn.onclick = async () => {
+                if (!player) return
+                try {
+                    const status = player.getStatus()
+                    if (status.isPlaying) {
+                        player.pause()
+                    } else {
+                        await player.play()
+                    }
+                } catch (error) {
+                    addLog('error', `播放控制失败: ${error.message}`)
+                }
+            }
+            
+            elements.pauseBtn.onclick = () => {
+                player?.pause()
+            }
+            
+            elements.stopBtn.onclick = () => {
+                player?.stop()
+            }
+            
+            // 音量控制
+            elements.volumeSlider.oninput = (e) => {
+                const volume = parseFloat(e.target.value)
+                player?.setVolume(volume)
+                elements.volumeDisplay.textContent = Math.round(volume * 100) + '%'
+            }
+            
+            addLog('info', '✅ 页面初始化完成')
+            
+            // 🚀 自动初始化播放器
+            addLog('info', '🚀 开始自动初始化播放器...')
+            await initializePlayer()
+            
+            // 等待一小段时间后检查播放状态
+            setTimeout(async () => {
+                if (player) {
+                    const status = player.getStatus()
+                    if (status.isPlaying) {
+                        addLog('info', '🎉 自动播放成功！无需任何用户交互')
+                        elements.autoPlayBtn.textContent = '✅ 已自动播放'
+                        elements.autoPlayBtn.style.background = 'linear-gradient(135deg, #10b981, #047857)'
+                        showSuccessMessage()
+                    } else {
+                        addLog('info', '🔍 自动播放未启动，可能需要用户交互')
+                        elements.autoPlayBtn.disabled = false
+                    }
+                }
+            }, 2000)
+        })
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval)
+            }
+            if (player) {
+                player.destroy()
+            }
+        })
+    </script>
+</body>
+</html>

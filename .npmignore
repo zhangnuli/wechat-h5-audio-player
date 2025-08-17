@@ -1,0 +1,46 @@
+# 开发相关文件
+.git/
+.github/
+.vscode/
+.idea/
+
+# 源码和配置（保留src用于调试）
+node_modules/
+coverage/
+.nyc_output/
+
+# 配置文件
+.gitignore
+.eslintrc*
+.prettierrc*
+tsconfig.json
+vite.config.ts
+vitest.config.ts
+
+# 临时文件
+*.tmp
+*.temp
+temp_*.txt
+
+# 测试文件
+test/
+tests/
+**/*.test.*
+**/*.spec.*
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# 环境文件
+.env*
+
+# OS文件
+.DS_Store
+Thumbs.db
+
+# 示例文件的依赖
+examples/frameworks/vue/node_modules/
+examples/frameworks/react/node_modules/
