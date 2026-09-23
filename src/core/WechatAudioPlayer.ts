@@ -36,6 +36,66 @@ import type {
 } from '../types'
 import { SoundJSBundle } from '../vendor/soundjs-bundle'
 
+class NativeAudioInstance implements SoundInstance {
+  constructor(private readonly audio: HTMLAudioElement) {}
+
+  public play(): SoundInstance {
+    void this.audio.play()
+    return this
+  }
+
+  public pause(): SoundInstance {
+    this.audio.pause()
+    return this
+  }
+
+  public stop(): SoundInstance {
+    this.audio.pause()
+    this.audio.currentTime = 0
+    return this
+  }
+
+  public setVolume(volume: number): SoundInstance {
+    this.audio.volume = volume
+    return this
+  }
+
+  public getVolume(): number {
+    return this.audio.volume
+  }
+
+  public setPosition(position: number): SoundInstance {
+    this.audio.currentTime = position / 1000
+    return this
+  }
+
+  public getPosition(): number {
+    return this.audio.currentTime * 1000
+  }
+
+  public setLoop(loop: number): SoundInstance {
+    this.audio.loop = loop !== 0
+    return this
+  }
+
+  public getDuration(): number {
+    return Number.isFinite(this.audio.duration) ? this.audio.duration * 1000 : 0
+  }
+
+  public on(event: string, handler: Function, scope?: any): void {
+    const nativeEvent = event === 'complete' ? 'ended' : event
+    this.audio.addEventListener(nativeEvent, handler.bind(scope))
+  }
+
+  public off(_event: string, _handler: Function, _scope?: any): void {}
+
+  public destroy(): void {
+    this.audio.pause()
+    this.audio.removeAttribute('src')
+    this.audio.load()
+  }
+}
+
 /**
  * 微信H5音频播放器类
  */
@@ -66,6 +126,18 @@ export class WechatAudioPlayer {
   
   /** WeixinJSBridgeReady事件是否已触发 */
   private weixinReady = false
+
+  /** iOS 微信使用的原生音频实例 */
+  private nativeAudio: HTMLAudioElement | null = null
+
+  /** 原生音频是否已经在微信 Bridge 回调中发起播放 */
+  private nativeAutoplayStarted = false
+
+  /** 原生音频是否正在等待可播放后重试 */
+  private nativeAutoplayPending = false
+
+  /** 微信 JSSDK ready 状态 */
+  private weixinJSSDKReady = false
 
   /**
    * 构造函数
@@ -204,7 +276,7 @@ export class WechatAudioPlayer {
       if (window.WeixinJSBridge) {
         this.log('info', 'WeixinJSBridge already available')
         this.weixinReady = true
-        this.loadAudio().then(() => resolve())
+        this.loadAudio(true).then(() => resolve())
         return
       }
 
@@ -215,7 +287,7 @@ export class WechatAudioPlayer {
         document.removeEventListener('WeixinJSBridgeReady', handleWeixinReady)
         
         // 在WeixinJSBridgeReady回调中注册音频（关键！）
-        this.loadAudio().then(() => resolve())
+        this.loadAudio(true).then(() => resolve())
       }
 
       document.addEventListener('WeixinJSBridgeReady', handleWeixinReady, false)
@@ -225,7 +297,7 @@ export class WechatAudioPlayer {
         if (!this.weixinReady) {
           this.log('warn', 'WeixinJSBridgeReady timeout, fallback to direct load')
           document.removeEventListener('WeixinJSBridgeReady', handleWeixinReady)
-          this.loadAudio().then(() => resolve())
+          this.loadAudio(false).then(() => resolve())
         }
       }, 5000)
     })
@@ -236,7 +308,14 @@ export class WechatAudioPlayer {
    * 
    * @private
    */
-  private async loadAudio(): Promise<void> {
+  private async loadAudio(playInWeixinBridge = false): Promise<void> {
+    if (this.environmentInfo.isWeixin && this.environmentInfo.isIOS && playInWeixinBridge && window.createjs?.Sound) {
+      return this.loadWeixinSoundInBridge()
+    }
+    if (this.shouldUseNativeWeixinAudio()) {
+      return this.loadNativeAudio(playInWeixinBridge)
+    }
+
     if (!window.createjs?.Sound) {
       throw new Error('SoundJS not available')
     }
@@ -272,6 +351,121 @@ export class WechatAudioPlayer {
 
     } catch (error) {
       throw new Error(`Failed to load audio: ${error}`)
+    }
+  }
+
+  /**
+   * iOS 微信兼容路径：注册和播放必须属于同一次 BridgeReady 流程。
+   * 这是旧版微信 WebView 对 SoundJS 音频授权仍兼容的关键顺序。
+   */
+  private async loadWeixinSoundInBridge(): Promise<void> {
+    const sound = window.createjs!.Sound
+    sound.registerSound(this.config.src, this.audioId)
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = setTimeout(() => reject(new Error('Audio load timeout')), this.config.loadOptions.timeout!)
+      const onLoad = (event: any): void => {
+        if (event.id !== this.audioId) return
+        clearTimeout(timeoutId)
+        this.audioLoaded = true
+        this.setState('ready')
+        this.emit('ready')
+        if (this.config.autoplay) {
+          try {
+            this.soundInstance = sound.play(this.audioId, {
+              loop: this.config.loop ? -1 : 0,
+              volume: this.config.muted ? 0 : this.config.volume
+            })
+            if (!this.soundInstance) throw new Error('Failed to create sound instance')
+            this.setupSoundInstanceEvents()
+            this.markPlaying()
+          } catch (error) {
+            reject(error)
+            return
+          }
+        }
+        resolve()
+      }
+      sound.on('fileload', onLoad, this)
+    })
+  }
+
+  /**
+   * iOS 微信不会把异步的 fileload 回调视为 WeixinJSBridgeReady 的播放时机。
+   * 原生 audio.play() 必须在 Bridge 回调的同步调用栈中执行，才能保留播放授权。
+   */
+  private async loadNativeAudio(playInWeixinBridge: boolean): Promise<void> {
+    if (this.nativeAudio) return
+
+    const audio = document.createElement('audio')
+    audio.preload = 'auto'
+    audio.src = this.config.src
+    audio.loop = this.config.loop
+    audio.volume = this.config.muted ? 0 : this.config.volume
+    audio.setAttribute('playsinline', '')
+    audio.setAttribute('webkit-playsinline', '')
+
+    this.nativeAudio = audio
+    this.soundInstance = new NativeAudioInstance(audio)
+
+    const loaded = new Promise<void>((resolve, reject) => {
+      const handleCanPlay = (): void => {
+        this.audioLoaded = true
+        if (this.state !== 'playing') {
+          this.setState('ready')
+        }
+        this.emit('ready')
+
+        if (this.config.autoplay && (this.nativeAutoplayPending || !this.nativeAutoplayStarted)) {
+          this.nativeAutoplayPending = false
+          this.play().catch(error => this.log('warn', 'Autoplay failed:', error))
+        }
+        resolve()
+      }
+
+      audio.addEventListener('canplay', handleCanPlay, { once: true })
+      audio.addEventListener('error', () => {
+        reject(new Error('Audio load error'))
+      }, { once: true })
+    })
+
+    audio.addEventListener('playing', () => this.markPlaying())
+    audio.addEventListener('ended', () => {
+      if (!this.config.loop) {
+        this.setState('stopped')
+        this.emit('ended')
+        this.log('info', 'Audio playback completed')
+      }
+    })
+
+    // This call must stay synchronous with WeixinJSBridgeReady on iOS.
+    if (this.config.autoplay && playInWeixinBridge) {
+      this.nativeAutoplayStarted = true
+      this.nativeAutoplayPending = true
+      this.unlockWeixinAudio(audio)
+    }
+
+    audio.load()
+
+    await loaded
+  }
+
+  private unlockWeixinAudio(audio: HTMLAudioElement): void {
+    const start = (): void => {
+      audio.play().then(() => {
+        this.nativeAutoplayPending = false
+        this.markPlaying()
+      }).catch(error => {
+        this.nativeAutoplayStarted = false
+        this.log('warn', 'WeChat iOS autoplay failed:', error)
+      })
+    }
+
+    // This Bridge call is the documented iOS WeChat audio-unlock path.
+    if (window.WeixinJSBridge) {
+      window.WeixinJSBridge.invoke('getNetworkType', {}, () => start())
+    } else {
+      start()
     }
   }
 
@@ -335,6 +529,18 @@ export class WechatAudioPlayer {
       throw new Error('Audio not loaded yet')
     }
 
+    if (this.nativeAudio) {
+      try {
+        await this.nativeAudio.play()
+        this.markPlaying()
+        return
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        this.handleError(err)
+        throw err
+      }
+    }
+
     if (!window.createjs?.Sound) {
       throw new Error('SoundJS not available')
     }
@@ -362,8 +568,7 @@ export class WechatAudioPlayer {
       // 设置音频实例事件监听
       this.setupSoundInstanceEvents()
 
-      this.setState('playing')
-      this.emit('play')
+      this.markPlaying()
       this.log('info', '🎵 Audio playback started successfully')
 
     } catch (error) {
@@ -727,6 +932,13 @@ export class WechatAudioPlayer {
     }
   }
 
+  private markPlaying(): void {
+    if (this.state === 'playing') return
+
+    this.setState('playing')
+    this.emit('play')
+  }
+
   /**
    * 检测环境信息
    * 
@@ -764,6 +976,10 @@ export class WechatAudioPlayer {
     }
   }
 
+  private shouldUseNativeWeixinAudio(): boolean {
+    return this.environmentInfo.isWeixin && this.environmentInfo.isIOS
+  }
+
   /**
    * 初始化微信JSSDK
    * 
@@ -777,21 +993,7 @@ export class WechatAudioPlayer {
 
     return new Promise<void>((resolve) => {
       try {
-        // 检查是否已加载微信JSSDK
-        if (typeof window.wx !== 'undefined') {
-          this.log('info', 'WeChat JSSDK already loaded')
-          resolve()
-          return
-        }
-
-        // 动态加载微信JSSDK
-        const script = document.createElement('script')
-        script.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js'
-        script.async = true
-
-        script.onload = () => {
-          this.log('info', 'WeChat JSSDK loaded successfully')
-          
+        const configure = (): void => {
           const jssdkConfig = this.config.weixinConfig.jssdkConfig!
           window.wx!.config({
             debug: jssdkConfig.debug || false,
@@ -804,13 +1006,32 @@ export class WechatAudioPlayer {
 
           window.wx!.ready(() => {
             this.log('info', 'WeChat JSSDK configured successfully')
+            this.weixinJSSDKReady = true
             resolve()
           })
 
           window.wx!.error((err: any) => {
             this.log('error', 'WeChat JSSDK configuration failed:', err)
-            resolve() // 不阻塞播放器初始化
+            resolve()
           })
+        }
+
+        // JSSDK may already be loaded by the host page. It still must be configured.
+        if (typeof window.wx !== 'undefined') {
+          this.log('info', 'WeChat JSSDK already loaded, configuring it')
+          configure()
+          return
+        }
+
+        // 动态加载微信JSSDK
+        const script = document.createElement('script')
+        script.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js'
+        script.async = true
+
+        script.onload = () => {
+          this.log('info', 'WeChat JSSDK loaded successfully')
+
+          configure()
         }
 
         script.onerror = () => {
